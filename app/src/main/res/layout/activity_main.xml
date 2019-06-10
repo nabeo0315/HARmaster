@@ -16,7 +16,7 @@
         android:layout_marginEnd="135dp"
         app:bootstrapBrand="info"
         app:bootstrapSize="lg"
-        app:bootstrapText="{fa-android-o} start"
+        app:bootstrapText="{fa-play} start"
         app:buttonMode="regular"
         app:roundedCorners="true" />
 
@@ -29,7 +29,24 @@
         android:layout_marginEnd="26dp"
         app:bootstrapBrand="danger"
         app:bootstrapSize="lg"
-        app:bootstrapText="{fa-smile-o} stop"
+        app:bootstrapText="{fa-stop} stop"
         app:buttonMode="regular"
         app:roundedCorners="true" />
+
+    <com.beardedhen.androidbootstrap.AwesomeTextView
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:text="-"
+        android:id="@+id/predicted_activity"
+        android:textSize="100dp"
+        android:layout_alignParentStart="true"
+        app:bootstrapBrand="primary"/>
+
+    <TextView
+        android:id="@+id/state_tv"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="184dp" />
 </RelativeLayout>

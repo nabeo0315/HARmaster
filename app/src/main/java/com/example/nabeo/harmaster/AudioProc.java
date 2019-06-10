@@ -49,9 +49,9 @@ public class AudioProc {
     public double[] featureBuffer = null;
 
     public final static String ROOT_DIR = Environment.getExternalStorageDirectory().toString();
-    private final static String MANNERMODE_PATH = ROOT_DIR +"/MannerMode";
-    private final static String OUTPUT_MFCC = MANNERMODE_PATH + "/output_mfcc.txt";
-    private final static String MODEL_AUDIO = MANNERMODE_PATH + "/model_audio2.model";
+    private final static String HARMASTER_PATH = ROOT_DIR +"/HARmaster";
+    private final static String OUTPUT_MFCC = HARMASTER_PATH + "/output_mfcc.txt";
+    private final static String MODEL_AUDIO = HARMASTER_PATH + "/model_audio2.model";
 
     private File file;
     private FileObserver fileObserver, dataObserver;
@@ -59,7 +59,7 @@ public class AudioProc {
     private LibSVM libsvm;
     private Scaller scaller;
 
-    private final static String SCALE_PATH = MANNERMODE_PATH + "/scale_sound.txt";
+    private final static String SCALE_PATH = HARMASTER_PATH + "/scale_sound.txt";
 
     private String mState = "";
     private boolean recordFlag;
@@ -83,7 +83,7 @@ public class AudioProc {
 
         recordFlag = true;
 
-        file = new File(MANNERMODE_PATH + "/" + "mfccvalue.txt");
+        file = new File(HARMASTER_PATH + "/" + "mfccvalue.txt");
         libsvm = new LibSVM();
 
         try {
@@ -92,19 +92,11 @@ public class AudioProc {
             e.printStackTrace();
         }
 
-        dataObserver = new FileObserver(MANNERMODE_PATH + "/" + "mfccvalue.txt") {
+        dataObserver = new FileObserver(HARMASTER_PATH + "/" + "mfccvalue.txt") {
             @Override
             public void onEvent(int event, @Nullable String path) {
                 if (event == FileObserver.CLOSE_WRITE) {
-                    libsvm.predict(MANNERMODE_PATH + "/" + "mfccvalue.txt" + " " + MODEL_AUDIO + " " + OUTPUT_MFCC);
-                }
-            }
-        };
-
-        fileObserver = new FileObserver(OUTPUT_MFCC) {
-            @Override
-            public void onEvent(int event, @Nullable String path) {
-                if(event == FileObserver.CLOSE_WRITE){
+                    libsvm.predict(HARMASTER_PATH + "/" + "mfccvalue.txt" + " " + MODEL_AUDIO + " " + OUTPUT_MFCC);
                     try {
                         BufferedReader bufferedReader = new BufferedReader(new FileReader(OUTPUT_MFCC));
                         String str = bufferedReader.readLine();
@@ -123,6 +115,29 @@ public class AudioProc {
                 }
             }
         };
+
+//        fileObserver = new FileObserver(OUTPUT_MFCC) {
+//            @Override
+//            public void onEvent(int event, @Nullable String path) {
+//                if(event == FileObserver.CLOSE_WRITE){
+//                    try {
+//                        BufferedReader bufferedReader = new BufferedReader(new FileReader(OUTPUT_MFCC));
+//                        String str = bufferedReader.readLine();
+//                        Log.d("str", str);
+//                        if(str.equals("1")){
+//                            mState = "Train";
+//                        } else if(str.equals("2")){
+//                            mState = "unknown";
+//                        } else if(str.equals("3")){
+//                            mState = "Bus";
+//                        }
+//                        bufferedReader.close();
+//                    } catch (IOException e) {
+//                        e.printStackTrace();
+//                    }
+//                }
+//            }
+//        };
 
         freqBandIdx = new int[FREQ_BANDEDGES.length];
         for (int i = 0; i < FREQ_BANDEDGES.length; i ++)
@@ -243,12 +258,14 @@ public class AudioProc {
                     bufferedWriter.write(str_scaled);
                     //bufferedWriter.write("\n");
                     bufferedWriter.close();
+
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
 
                 Log.v("f", sb.toString());
                 Log.v("sample", String.valueOf(readAudioSamples));
+                Log.v("state", mState);
             }
         }
     }

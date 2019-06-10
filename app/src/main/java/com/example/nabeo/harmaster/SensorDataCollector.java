@@ -17,8 +17,13 @@ import android.location.LocationProvider;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.FileObserver;
+import android.os.Handler;
 import android.os.PowerManager;
 import android.util.Log;
+
+import com.beardedhen.androidbootstrap.AwesomeTextView;
+import com.beardedhen.androidbootstrap.BootstrapText;
+import com.beardedhen.androidbootstrap.api.view.BootstrapTextView;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -41,6 +46,7 @@ public class SensorDataCollector implements SensorEventListener {
 
     private SensorManager mSensorManager;
     private Context mContext;
+    private AwesomeTextView mTextView;
 
     private float[] acc = new float[3];
     private float[] globalAccValues = new float[3];
@@ -86,29 +92,22 @@ public class SensorDataCollector implements SensorEventListener {
     private String mGpsState = null;
 
     public final static String ROOT_DIR = Environment.getExternalStorageDirectory().toString();
-    private final static String MANNERMODE_PATH = ROOT_DIR +"/MannerMode";
-    private final static String MODEL_PATH = MANNERMODE_PATH + "/6state_20s7f.model";
-    private final static String OUTPUT_PATH = MANNERMODE_PATH + "/output.txt";
-    private final static String SCALE_PATH = MANNERMODE_PATH + "/scale_range_20s.txt";
-    private final static String NOW_INFO_PATH = MANNERMODE_PATH + "/now_info";
-//    private final static String TESTDATA_SCALED_PATH = MANNERMODE_PATH + "/testdata_scaled.txt";
-//    private final static String TESTDATA_PATH = MANNERMODE_PATH + "testdata.txt";
+    private final static String HARMASTER_PATH = ROOT_DIR +"/HARmaster";
+    private final static String MODEL_PATH = HARMASTER_PATH + "/9state_model_windowSize_5s_scaled.txt.model";
+    private final static String OUTPUT_PATH = HARMASTER_PATH + "/output.txt";
+    private final static String SCALE_PATH = HARMASTER_PATH + "/scale_data.txt";
+    private final static String NOW_INFO_PATH = HARMASTER_PATH + "/now_info";
+//    private final static String TESTDATA_SCALED_PATH = HARMASTER_PATH + "/testdata_scaled.txt";
+//    private final static String TESTDATA_PATH = HARMASTER_PATH + "testdata.txt";
     private String mFolderName;
     private String mState = "";
-    private int mPublicTransportCount = 0;
-    private int mOtherStateCount = 0;
-    private int mMovingCount = 0;
-    private boolean isPublicTransportation = false;
-
-    private PowerManager mPowerManager;
 
     SensorDataCollector(Context context){
         mContext = context;
 
-        mPowerManager = (PowerManager)mContext.getSystemService(Context.POWER_SERVICE);
-
         mSensorManager = (SensorManager)mContext.getSystemService(Context.SENSOR_SERVICE);
         List<Sensor> sensors = mSensorManager.getSensorList(Sensor.TYPE_ALL);
+        mTextView = (AwesomeTextView)((com.example.nabeo.harmaster.MainActivity)mContext).findViewById(R.id.predicted_activity);
 
         for (Sensor sensor : sensors) {
             if (sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
@@ -200,7 +199,6 @@ public class SensorDataCollector implements SensorEventListener {
         createTemplateFile();
         createGpsValuesCSV();
 
-
         try {
             scaller = new Scaller().loadRange(new File(SCALE_PATH));
         } catch (IOException e) {
@@ -252,6 +250,8 @@ public class SensorDataCollector implements SensorEventListener {
             }
         }, preparationTime); //準備時間
 
+        final Handler handler = new Handler();
+
         outputObserver = new FileObserver(OUTPUT_PATH) {
             @Override
             public void onEvent(int event, String path) {
@@ -271,46 +271,52 @@ public class SensorDataCollector implements SensorEventListener {
                         switch (label) {
                             case 1:
                                 mState = "Stop";
-                                mMovingCount = 0;
-                                if (isPublicTransportation) break;
-                                mPublicTransportCount = 0;
-                                mOtherStateCount++;
                                 break;
                             case 2:
                                 mState = "Walking";
-                                mPublicTransportCount = 0;
-                                mMovingCount++;
-                                mOtherStateCount++;
+                                break;
+                            case 3:
+                                mState = "Upstairs";
+                                break;
+                            case 4:
+                                mState = "Downstairs";
+                                break;
+                            case 5:
+                                mState = "Up-Elevator";
+                                break;
+                            case 6:
+                                mState = "Down-Elevator";
                                 break;
                             case 7:
                                 mState = "Running";
-                                mPublicTransportCount = 0;
-                                mMovingCount++;
-                                mOtherStateCount++;
                                 break;
                             case 8:
-                                mState = "Bicycle";
-                                mPublicTransportCount = 0;
-                                mMovingCount++;
-                                mOtherStateCount++;
+                                mState = "Up-Escalator";
                                 break;
                             case 9:
-                                mState = "Train";
-                                mMovingCount = 0;
-                                mOtherStateCount = 0;
-                                mPublicTransportCount++;
+                                mState = "Down-Escalator";
                                 break;
                             case 10:
-                                mState = "Bus";
-                                mMovingCount = 0;
-                                mOtherStateCount = 0;
-                                mPublicTransportCount++;
+                                mState = "Bicycle";
                                 break;
+//                            case 11:
+//                                mState = "Train";
+//                                break;
+//                            case 12:
+//                                mState = "Bus";
+//                                break;
                             default:
                                 break;
                         }
                     }
                 }
+
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        mTextView.setText(mState);
+                    }
+                });
             }
         };
     }
@@ -383,7 +389,7 @@ public class SensorDataCollector implements SensorEventListener {
 
     //CSVファイルのテンプレート（一行目の項目名）を作成
     private void createTemplateFile() {
-        File file = new File(MANNERMODE_PATH + "/" + mFolderName + "/" + "values.csv");
+        File file = new File(HARMASTER_PATH + "/" + "values.csv");
         String items = "TimeStamp," +
                 "Acc_X," + "Acc_Y," + "Acc_Z," +
                 "Acc_X_Glo," + "Acc_Y_Glo," + "Acc_Z_Glo," +
@@ -402,7 +408,7 @@ public class SensorDataCollector implements SensorEventListener {
 
     private void recordLogfile(){
         Timestamp timestamp = new Timestamp(System.currentTimeMillis());
-        File file = new File(MANNERMODE_PATH + "/" + "log.csv");
+        File file = new File(HARMASTER_PATH + "/" + "log.csv");
         try{
             BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file, true), "UTF-8"));
             bufferedWriter.close();
@@ -414,7 +420,7 @@ public class SensorDataCollector implements SensorEventListener {
     //センサ値をを格納 (CSVファイルの2行目以降)
     private void storeValues(float[] values) {
         Timestamp timestamp = new Timestamp(System.currentTimeMillis());
-        String file = MANNERMODE_PATH + "/" + mFolderName + "/" + "values.csv";
+        String file = HARMASTER_PATH + "/" + "values.csv";
         try {
             BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file, true), "UTF-8"));
             bufferedWriter.write(timestamp.toString() + ",");
@@ -440,7 +446,7 @@ public class SensorDataCollector implements SensorEventListener {
     private void createGpsValuesCSV(){
         String firstLine = "TimeStamp,Latitude,Longitude,Speed,State,SpeedDifference";
         try{
-            BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(MANNERMODE_PATH + "/" + mFolderName + "/gps_result.txt", true), "UTF-8"));
+            BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(HARMASTER_PATH + "/" + mFolderName + "/gps_result.txt", true), "UTF-8"));
             bufferedWriter.write(firstLine);
             bufferedWriter.write("\n");
             bufferedWriter.close();
@@ -451,7 +457,7 @@ public class SensorDataCollector implements SensorEventListener {
 
     private void storeGpsValues(){
         try{
-            BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(MANNERMODE_PATH + "/" + mFolderName + "/gps_result.txt", true), "UTF-8"));
+            BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(HARMASTER_PATH + "/" + mFolderName + "/gps_result.txt", true), "UTF-8"));
             bufferedWriter.write(new Timestamp(System.currentTimeMillis()).toString() + "," + mLatitude + "," + mLongitude + "," + gpsSpeedinKilo + "," + mGpsState + "," + gpsSpeedDifferential);
             bufferedWriter.write("\n");
             bufferedWriter.close();
@@ -467,7 +473,7 @@ public class SensorDataCollector implements SensorEventListener {
         param = getParam();
         if (!Double.isNaN(param[0]) && !Double.isNaN(param[1]) && !Double.isNaN(param[2]) && !Double.isNaN(param[3]) && !Double.isNaN(param[4])) {
             //9 is parameter number of train.
-            String str = "0 1:" + paramf.format(param[0]) + " 2:" + paramf.format(param[1]) + " 3:" + paramf.format(param[2]) + " 4:" + paramf.format(param[3]) + " 5:" + paramf.format(param[4]) + " 6:" + paramf.format(param[5]) + " 7:" + paramf.format(param[6]);
+            String str = "0 1:" + paramf.format(param[0]) + " 2:" + paramf.format(param[1]) + " 3:" + paramf.format(param[2]) + " 4:" + paramf.format(param[3]) + " 5:" + paramf.format(param[4]);
             Log.d("param_str", str);
             String str_scaled = scaller.calcScaleFromLine(str);
             Log.d("param_str_scaled", str_scaled);
@@ -476,8 +482,8 @@ public class SensorDataCollector implements SensorEventListener {
                 bufferedWriter.write(str_scaled);
                 bufferedWriter.close();
 
-                FileWriter testFile = new FileWriter(new File(MANNERMODE_PATH + "/" + mFolderName + "/testdata.txt"), true);
-                FileWriter testFileScaled = new FileWriter(new File(MANNERMODE_PATH + "/" + mFolderName + "/testdata_scaled.txt"), true);
+                FileWriter testFile = new FileWriter(new File(HARMASTER_PATH + "/" + mFolderName + "/testdata.txt"), true);
+                FileWriter testFileScaled = new FileWriter(new File(HARMASTER_PATH + "/" + mFolderName + "/testdata_scaled.txt"), true);
                 testFile.write(str + "\n");
                 testFileScaled.write(str_scaled + "\n");
                 testFile.close();
@@ -610,7 +616,7 @@ public class SensorDataCollector implements SensorEventListener {
 
     public boolean setFolderName(String folderName){
         mFolderName = folderName;
-        File collectAppFile = new File(MANNERMODE_PATH + "/" + mFolderName);
+        File collectAppFile = new File(HARMASTER_PATH + "/" + mFolderName);
         if(!collectAppFile.exists()) {
             //Log.d("d" , "mkdir");
             collectAppFile.mkdir();
