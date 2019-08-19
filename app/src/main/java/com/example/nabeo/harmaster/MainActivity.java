@@ -1,6 +1,16 @@
 package com.example.nabeo.harmaster;
 
 import android.Manifest;
+import android.app.ActivityManager;
+import android.app.Application;
+import android.content.BroadcastReceiver;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.pm.ApplicationInfo;
+import android.net.wifi.ScanResult;
+import android.os.Build;
+import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentTransaction;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.location.Location;
@@ -14,13 +24,21 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.beardedhen.androidbootstrap.AwesomeTextView;
 import com.beardedhen.androidbootstrap.BootstrapButton;
+import com.squareup.picasso.LruCache;
+import com.squareup.picasso.Picasso;
+
+import org.w3c.dom.Text;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -28,6 +46,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -37,6 +57,7 @@ public class MainActivity extends AppCompatActivity {
     private static SensorDataCollector mSensorDataCollector;
     private static AudioProc mAudioProc;
     private TextView mStatusTv;
+    private TextView mStationTv;
     private AwesomeTextView mainTv;
 
     public final static String ROOT_DIR = Environment.getExternalStorageDirectory().toString();
@@ -48,10 +69,17 @@ public class MainActivity extends AppCompatActivity {
     private static double gpsSpeedinKilo = 0;
     private double mLongitude = 0;
     private double mLatitude = 0;
+    private Timer timer;
 
     private static boolean recordFlag = false;
-    private static String nowState = "", tempState = "", state = "", audioState;
-    private static int count = 0, activityCount = 0, vehicleCount = 0;
+    private static boolean mInStation = false;
+    private static String nowState = "", tempState = "", state = "", audioState, preState = "";
+    private static int count = 0, activityCount = 0, vehicleCount = 0, wifiCount = 0, awayCount = 0;
+
+    private RecyclerView mRecyclerView;
+    private RecyclerAdapter mAdapter;
+    private ArrayList<ActivityItem> mData;
+    private Timestamp mPreTime;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,6 +88,7 @@ public class MainActivity extends AppCompatActivity {
         mContext = this;
         mStatusTv = (TextView)findViewById(R.id.state_tv);
         mainTv = (AwesomeTextView)findViewById(R.id.predicted_activity);
+        mStationTv = (TextView)findViewById(R.id.station_tv);
 
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
@@ -92,6 +121,7 @@ public class MainActivity extends AppCompatActivity {
                 mLongitude = location.getLongitude();
                 mLatitude = location.getLatitude();
                 Log.d("gpsSpeedinKilo", String.valueOf(gpsSpeedinKilo));
+                mStatusTv.setText("gpsSpeed" + gpsSpeedinKilo);
 
 
                 Bundle extra = location.getExtras();
@@ -136,6 +166,13 @@ public class MainActivity extends AppCompatActivity {
 
         mAudioProc = new AudioProc();
 
+        mRecyclerView = (RecyclerView) findViewById(R.id.pict_recycler);
+        mRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+        mData = new ArrayList<>();
+        mAdapter = new RecyclerAdapter(this, mData);
+        mRecyclerView.setAdapter(mAdapter);
+        //mRecyclerView.addItemDecoration(new CustomItemDecoration(1, mContext));
+
         mStartButton = (BootstrapButton)findViewById(R.id.start_button);
         mStopButton = (BootstrapButton)findViewById(R.id.stop_button);
 
@@ -165,7 +202,7 @@ public class MainActivity extends AppCompatActivity {
         mSensorDataCollector.startSensor();
 
         final Handler handler = new Handler();
-        Timer timer = new Timer();
+        timer = new Timer();
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
@@ -193,7 +230,7 @@ public class MainActivity extends AppCompatActivity {
                         }
                     });
 
-                    writeFile(timestamp.toString() + " " + audioState + "  (audio)" + " " + nowState + " " + gpsSpeedinKilo + " " + mLongitude + " " + mLatitude, "predicted_activity.txt");
+                    writeFile(timestamp.toString() + " " + audioState + "(audio)" + " " + nowState + " " + gpsSpeedinKilo + " " + mLongitude + " " + mLatitude, "predicted_activity.txt");
                     writeFile(timestamp.toString() + " " + nowState, "corrected_result.txt");
 
                     if (tempState.equals(audioState)) count++;
@@ -205,13 +242,73 @@ public class MainActivity extends AppCompatActivity {
                     }
                     tempState = audioState;
                 }
-                //((WifiManager) mContext.getApplicationContext().getSystemService(Context.WIFI_SERVICE)).startScan();
+
+                //set pictogram
+                if(!preState.equals(nowState)){
+                    handler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            preState = nowState;
+                            mData.add(new ActivityItem(nowState));
+                            mAdapter.notifyItemInserted(mData.size());
+                            int size = mData.size();
+                            if(size > 1){
+                                Timestamp nowTime = new Timestamp(System.currentTimeMillis());
+                                ActivityItem activityItem = new ActivityItem(mData.get(size-2).getState());
+                                activityItem.setTime(nowTime.getTime() - mPreTime.getTime());
+
+                                mData.set(size-2, activityItem);
+                                //mData.get(size-1).setDistance();
+                                mAdapter.notifyItemChanged(size-1, activityItem);
+                                Log.v("change", String.valueOf(nowTime.getTime() - mPreTime.getTime()));
+                            }
+                            mPreTime = new Timestamp(System.currentTimeMillis());
+                        }
+                    });
+                }
             }
         }, 0, 1000);
+
+        mContext.registerReceiver(new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                List<ScanResult> resultList = ((WifiManager)mContext.getSystemService(Context.WIFI_SERVICE)).getScanResults();
+                int resultSize = resultList.size();
+                wifiCount = 0;
+                for(ScanResult scanResult:resultList){
+                    if(scanResult.SSID.equals("TOBU_Free_Wi-Fi") || scanResult.SSID.equals("Metro_Free_Wi-Fi")){
+                        Log.d("SSID", scanResult.SSID);
+                        mInStation = true;
+                        getBaseContext().sendBroadcast(new Intent().setAction("Station").putExtra("station", "in the station."));
+                        awayCount = 0;
+                        handler.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                mainTv.setText("in the station.....");
+                            }
+                        });
+                        break;
+                    }
+                    wifiCount++;
+                    if(wifiCount == resultSize && mInStation && !recordFlag && state.equals("Stop")) {
+                        awayCount++;
+                        if(awayCount > 3) {
+                            mInStation = false;
+                            mAudioProc.startRecording();
+                            recordFlag = true;
+                            getBaseContext().sendBroadcast(new Intent().setAction("Station").putExtra("station", "out of the station."));
+                        }
+                    }
+                }
+                ((WifiManager) mContext.getApplicationContext().getSystemService(Context.WIFI_SERVICE)).startScan();
+            }
+        }, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));
+        ((WifiManager) mContext.getApplicationContext().getSystemService(Context.WIFI_SERVICE)).startScan();
     }
 
     private void stopPrediction(){
         mSensorDataCollector.stopSensor();
+        timer.cancel();
     }
 
     public static void setActivity(){
@@ -220,7 +317,7 @@ public class MainActivity extends AppCompatActivity {
         if(state.equals("Stop")){
             activityCount = 0;
         }
-        if(gpsSpeedinKilo > 20){
+        if(gpsSpeedinKilo > 8 && state.equals("Stop")){
             vehicleCount++;
             if(!recordFlag && vehicleCount > 4){
                 recordFlag = true;

@@ -66,7 +66,7 @@ public class SensorDataCollector implements SensorEventListener {
     private float[] gravity = new float[3];
     private float[] linear_acc = new float[3];
     private int storeValuesCount = 0;
-    private int preparationTime = 2000; //カウントダウン後の準備時間(ミリ秒)
+    private int preparationTime = 5000; //カウントダウン後の準備時間(ミリ秒)
     private int collectRawDataInterval = 20; //20msの間隔
     private int predictInterval = 1000; //???msの間隔
     private int decisionCount = 5;
@@ -266,6 +266,8 @@ public class SensorDataCollector implements SensorEventListener {
                         e.printStackTrace();
                     }
                     Log.d("str", String.valueOf(str));
+
+                    if(getVar_AccZ() > 1 && getAve_AccZ() < 6 && gpsSpeedinKilo > 8) str = "10";
                     if (str != null) {
                         int label = Integer.parseInt(str);
                         switch (label) {
@@ -482,8 +484,8 @@ public class SensorDataCollector implements SensorEventListener {
                 bufferedWriter.write(str_scaled);
                 bufferedWriter.close();
 
-                FileWriter testFile = new FileWriter(new File(HARMASTER_PATH + "/" + mFolderName + "/testdata.txt"), true);
-                FileWriter testFileScaled = new FileWriter(new File(HARMASTER_PATH + "/" + mFolderName + "/testdata_scaled.txt"), true);
+                FileWriter testFile = new FileWriter(new File(HARMASTER_PATH + "/testdata.txt"), true);
+                FileWriter testFileScaled = new FileWriter(new File(HARMASTER_PATH + "/testdata_scaled.txt"), true);
                 testFile.write(str + "\n");
                 testFileScaled.write(str_scaled + "\n");
                 testFile.close();

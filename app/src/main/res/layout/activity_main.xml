@@ -14,7 +14,7 @@
         android:layout_alignParentEnd="true"
         android:layout_marginBottom="13dp"
         android:layout_marginEnd="135dp"
-        app:bootstrapBrand="info"
+        app:bootstrapBrand="primary"
         app:bootstrapSize="lg"
         app:bootstrapText="{fa-play} start"
         app:buttonMode="regular"
@@ -34,19 +34,47 @@
         app:roundedCorners="true" />
 
     <com.beardedhen.androidbootstrap.AwesomeTextView
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:text="-"
         android:id="@+id/predicted_activity"
-        android:textSize="100dp"
-        android:layout_alignParentStart="true"
-        app:bootstrapBrand="primary"/>
-
-    <TextView
-        android:id="@+id/state_tv"
-        android:layout_width="wrap_content"
+        android:layout_width="fill_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentStart="true"
         android:layout_alignParentTop="true"
-        android:layout_marginTop="184dp" />
+        android:text="-"
+        android:textSize="50dp"
+        app:bootstrapBrand="primary" />
+
+    <com.beardedhen.androidbootstrap.AwesomeTextView
+        android:id="@+id/pictogram_text"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="86dp"
+        android:text="pictogram↓"
+        android:textSize="30dp"
+        app:bootstrapBrand="primary" />
+
+    <TextView
+        android:id="@+id/state_tv"
+        android:layout_width="133dp"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/start_button"
+        android:layout_alignParentStart="true" />
+
+    <android.support.v7.widget.RecyclerView
+        android:id="@+id/pict_recycler"
+        android:layout_width="match_parent"
+        android:layout_height="296dp"
+        android:layout_alignParentStart="true"
+        android:layout_below="@+id/pictogram_text">
+
+    </android.support.v7.widget.RecyclerView>
+
+    <TextView
+        android:id="@+id/station_tv"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/state_tv"
+        android:layout_alignParentEnd="true" />
+
 </RelativeLayout>

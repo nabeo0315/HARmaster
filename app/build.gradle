@@ -27,4 +27,6 @@ dependencies {
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
     implementation 'com.beardedhen:androidbootstrap:2.3.2'
     implementation project(':androidlibsvm-release')
+    implementation 'com.android.support:recyclerview-v7:27.1.1'
+    implementation 'com.squareup.picasso:picasso:2.71828'
 }

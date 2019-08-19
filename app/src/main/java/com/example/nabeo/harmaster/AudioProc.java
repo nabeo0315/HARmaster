@@ -54,7 +54,7 @@ public class AudioProc {
     private final static String MODEL_AUDIO = HARMASTER_PATH + "/model_audio2.model";
 
     private File file;
-    private FileObserver fileObserver, dataObserver;
+    private FileObserver dataObserver;
 
     private LibSVM libsvm;
     private Scaller scaller;
@@ -165,7 +165,7 @@ public class AudioProc {
         audioRecorder.startRecording();
         recordingThread.start();
         dataObserver.startWatching();
-        fileObserver.startWatching();
+        //fileObserver.startWatching();
     }
 
     private void handleAudioStream()
@@ -276,7 +276,7 @@ public class AudioProc {
 
     public void stop(){
         recordFlag = false;
-        fileObserver.stopWatching();
+        //fileObserver.stopWatching();
         dataObserver.stopWatching();
         audioRecorder.stop();
         recordingThread.interrupt();
