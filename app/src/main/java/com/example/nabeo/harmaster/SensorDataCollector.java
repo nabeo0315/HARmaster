@@ -93,7 +93,7 @@ public class SensorDataCollector implements SensorEventListener {
 
     public final static String ROOT_DIR = Environment.getExternalStorageDirectory().toString();
     private final static String HARMASTER_PATH = ROOT_DIR +"/HARmaster";
-    private final static String MODEL_PATH = HARMASTER_PATH + "/9state_model_windowSize_5s_scaled.txt.model";
+    private final static String MODEL_PATH = HARMASTER_PATH + "/9state_model_windowSize_5s_optionB.model";//"/9state_model_windowSize_5s_scaled.txt.model";
     private final static String OUTPUT_PATH = HARMASTER_PATH + "/output.txt";
     private final static String SCALE_PATH = HARMASTER_PATH + "/scale_data.txt";
     private final static String NOW_INFO_PATH = HARMASTER_PATH + "/now_info";
@@ -231,13 +231,13 @@ public class SensorDataCollector implements SensorEventListener {
                         if (isParam) {
                             if (storeValuesCount > windowSize + 1) {
                                 createParam(); //特徴量生成 時間窓5秒
-                                if(predictFlag) libsvm.predict(NOW_INFO_PATH + " " + MODEL_PATH + " " + OUTPUT_PATH);
+                                if(predictFlag) libsvm.predict("-b 1 " + NOW_INFO_PATH + " " + MODEL_PATH + " " + OUTPUT_PATH);
                                 if(getAve_AccXY()  > 4 && !predictFlag){
                                     mState = "Walking";
                                 }
                                 //Log.d("d", "s");
                                 recordLogfile();
-                                storeGpsValues();
+                                //storeGpsValues();
                             }
                             if (!fileObserverFlag) {
                                 outputObserver.startWatching();
@@ -256,10 +256,13 @@ public class SensorDataCollector implements SensorEventListener {
             @Override
             public void onEvent(int event, String path) {
                 String str = "";
+                String[] array = {};
                 if (event == FileObserver.CLOSE_WRITE) {
                     try {
                         BufferedReader bufferedReader = new BufferedReader(new FileReader(OUTPUT_PATH));
                         str = bufferedReader.readLine();
+                        array = bufferedReader.readLine().split(" ");
+                        str = array[0];
                         Log.d("str", str);
                         bufferedReader.close();
                     } catch (IOException e) {

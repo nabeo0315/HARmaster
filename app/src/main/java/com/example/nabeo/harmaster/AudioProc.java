@@ -51,7 +51,7 @@ public class AudioProc {
     public final static String ROOT_DIR = Environment.getExternalStorageDirectory().toString();
     private final static String HARMASTER_PATH = ROOT_DIR +"/HARmaster";
     private final static String OUTPUT_MFCC = HARMASTER_PATH + "/output_mfcc.txt";
-    private final static String MODEL_AUDIO = HARMASTER_PATH + "/model_audio2.model";
+    private final static String MODEL_AUDIO = HARMASTER_PATH + "/0828_model_optionb.model";//"/model_audio2.model";
 
     private File file;
     private FileObserver dataObserver;
@@ -63,6 +63,8 @@ public class AudioProc {
 
     private String mState = "";
     private boolean recordFlag;
+
+    private double[] probs = new double[12];
 
     AudioProc(){
 
@@ -96,19 +98,37 @@ public class AudioProc {
             @Override
             public void onEvent(int event, @Nullable String path) {
                 if (event == FileObserver.CLOSE_WRITE) {
-                    libsvm.predict(HARMASTER_PATH + "/" + "mfccvalue.txt" + " " + MODEL_AUDIO + " " + OUTPUT_MFCC);
+                    libsvm.predict("-b 1 " + HARMASTER_PATH + "/" + "mfccvalue.txt" + " " + MODEL_AUDIO + " " + OUTPUT_MFCC);
                     try {
                         BufferedReader bufferedReader = new BufferedReader(new FileReader(OUTPUT_MFCC));
                         String str = bufferedReader.readLine();
+                        //markov
+                        String[] array = bufferedReader.readLine().split(" ");
+                        str = array[0];
                         Log.d("str", str);
                         if(str.equals("1")){
                             mState = "Train";
                         } else if(str.equals("2")){
-                            mState = "unknown";
+                            mState = " ";
                         } else if(str.equals("3")){
                             mState = "Bus";
                         }
                         bufferedReader.close();
+
+                        if(str.equals("1") || str.equals("3")){
+                            probs[0] = 0;
+                            probs[1] = 0;
+                            probs[2] = 0;
+                            probs[3] = 0;
+                            probs[4] = 0;
+                            probs[5] = 0;
+                            probs[6] = 0;
+                            probs[7] = 0;
+                            probs[8] = 0;
+                            probs[9] = 0;
+                            probs[10] = Double.valueOf(array[3]);
+                            probs[11] = Double.valueOf(array[1]);
+                        }
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -272,6 +292,10 @@ public class AudioProc {
 
     public String getState(){
         return this.mState;
+    }
+
+    public double[] getProbs(){
+        return this.probs;
     }
 
     public void stop(){

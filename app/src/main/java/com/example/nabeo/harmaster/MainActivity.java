@@ -67,14 +67,17 @@ public class MainActivity extends AppCompatActivity {
     private String mGpsState;
     private LocationListener mLocationListener;
     private static double gpsSpeedinKilo = 0;
+    private int gpsSpeedCounter = 0;
+    private double gpsSpeedTemp = 0;
     private double mLongitude = 0;
     private double mLatitude = 0;
     private Timer timer;
 
     private static boolean recordFlag = false;
     private static boolean mInStation = false;
-    private static String nowState = "", tempState = "", state = "", audioState, preState = "";
-    private static int count = 0, activityCount = 0, vehicleCount = 0, wifiCount = 0, awayCount = 0;
+    private static String nowState = "", tempState = "Stop", state = "Stop", audioState, preState = "", markovState="Stop";
+    private static String[] stateArray, correctedStateArray;
+    private static int count = 0, activityCount = 0, vehicleCount = 0, wifiCount = 0, awayCount = 0, stateCount = 0;
 
     private RecyclerView mRecyclerView;
     private RecyclerAdapter mAdapter;
@@ -91,7 +94,6 @@ public class MainActivity extends AppCompatActivity {
         mStationTv = (TextView)findViewById(R.id.station_tv);
 
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-
 
         if(ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED){
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 999);
@@ -122,7 +124,6 @@ public class MainActivity extends AppCompatActivity {
                 mLatitude = location.getLatitude();
                 Log.d("gpsSpeedinKilo", String.valueOf(gpsSpeedinKilo));
                 mStatusTv.setText("gpsSpeed" + gpsSpeedinKilo);
-
 
                 Bundle extra = location.getExtras();
                 if (extra != null) {
@@ -158,8 +159,20 @@ public class MainActivity extends AppCompatActivity {
             public void onProviderDisabled(String s) {
 
             }
-
         };
+
+        Timer gpsTimer = new Timer();
+        gpsTimer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                if(gpsSpeedTemp == gpsSpeedinKilo){
+                    //initialize gpsSpeedinKilo
+                    gpsSpeedinKilo = 0;
+                }else{
+                    gpsSpeedTemp = gpsSpeedinKilo;
+                }
+            }
+        }, 0, 5000);
 
         mLocationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, mLocationListener);
         mLocationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, mLocationListener);
@@ -201,6 +214,11 @@ public class MainActivity extends AppCompatActivity {
         mSensorDataCollector = new SensorDataCollector(this);
         mSensorDataCollector.startSensor();
 
+        //final MarkovProc markovProc = new MarkovProc();
+        final Viterbi viterbi = new Viterbi();
+        stateArray = new String[30];
+        correctedStateArray = new String[30];
+
         final Handler handler = new Handler();
         timer = new Timer();
         timer.schedule(new TimerTask() {
@@ -209,19 +227,44 @@ public class MainActivity extends AppCompatActivity {
                 Timestamp timestamp = new Timestamp(System.currentTimeMillis());
                 setActivity();
                 if (!recordFlag) {
+                    if(stateCount < 30){
+                        stateArray[stateCount] = state;
+                        correctedStateArray[stateCount] = nowState;
+                        Log.d("stateArray[" + stateCount + "]", stateArray[stateCount]);
+                        stateCount++;
+                    }else if(stateCount >= 30){
+                        writeFile(viterbi.viterbiAlgorithm(stateArray, correctedStateArray), "viterbi.csv");
+                        Log.d("viterbi", viterbi.viterbiAlgorithm(stateArray, correctedStateArray));
+                        stateCount = 0;
+                    }
+                    //markovState = markovProc.getState(probs, markovState);
                     writeFile(timestamp.toString() + " " + state + " " + nowState + " " + gpsSpeedinKilo + " " + mLongitude + " " + mLatitude, "predicted_activity.txt");
                     writeFile(timestamp.toString() + " " + nowState, "corrected_result.txt");
+                    writeFile(timestamp.toString() + "," + state+ "," + nowState, "compare.csv");
 
                     if (tempState.equals(state)) count++;
                     else count = 0;
                     if (count > 8) {
-                        if (!((nowState.equals("Bus") || nowState.equals("Bicycle")) && state.equals("Train")) && !((nowState.equals("Train") || nowState.equals("Bicycle")) && state.equals("Bus")) && !((nowState.equals("Train") || nowState.equals("Bus")) && state.equals("Bicycle"))) {
+                        if (!((nowState.equals("Bus") || nowState.equals("Bicycle")) && state.equals("Train"))
+                                && !((nowState.equals("Train") || nowState.equals("Bicycle")) && state.equals("Bus"))
+                                && !((nowState.equals("Train") || nowState.equals("Bus")) && state.equals("Bicycle"))
+                                && !((nowState.equals("Up-Elevator") || nowState.equals("Down-Elevator")) && state.equals("Bicycle"))){
                             nowState = state;
                         }
                     }
                     tempState = state;
                 } else if (recordFlag) {
                     audioState = mAudioProc.getState();
+                    //markovState = markovProc.getState(audioProbs, markovState);
+
+                    if(stateCount < 30){
+                        stateArray[stateCount] = audioState;
+                        correctedStateArray[stateCount] = nowState;
+                        stateCount++;
+                    }else if(stateCount >= 30){
+                        writeFile(viterbi.viterbiAlgorithm(stateArray, correctedStateArray), "viterbi.csv");
+                        stateCount = 0;
+                    }
 
                     handler.post(new Runnable() {
                         @Override
@@ -232,6 +275,7 @@ public class MainActivity extends AppCompatActivity {
 
                     writeFile(timestamp.toString() + " " + audioState + "(audio)" + " " + nowState + " " + gpsSpeedinKilo + " " + mLongitude + " " + mLatitude, "predicted_activity.txt");
                     writeFile(timestamp.toString() + " " + nowState, "corrected_result.txt");
+                    writeFile(timestamp.toString() + "," + audioState + "," + nowState, "compare.csv");
 
                     if (tempState.equals(audioState)) count++;
                     else count = 0;
@@ -268,42 +312,42 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }, 0, 1000);
-
-        mContext.registerReceiver(new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                List<ScanResult> resultList = ((WifiManager)mContext.getSystemService(Context.WIFI_SERVICE)).getScanResults();
-                int resultSize = resultList.size();
-                wifiCount = 0;
-                for(ScanResult scanResult:resultList){
-                    if(scanResult.SSID.equals("TOBU_Free_Wi-Fi") || scanResult.SSID.equals("Metro_Free_Wi-Fi")){
-                        Log.d("SSID", scanResult.SSID);
-                        mInStation = true;
-                        getBaseContext().sendBroadcast(new Intent().setAction("Station").putExtra("station", "in the station."));
-                        awayCount = 0;
-                        handler.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                mainTv.setText("in the station.....");
-                            }
-                        });
-                        break;
-                    }
-                    wifiCount++;
-                    if(wifiCount == resultSize && mInStation && !recordFlag && state.equals("Stop")) {
-                        awayCount++;
-                        if(awayCount > 3) {
-                            mInStation = false;
-                            mAudioProc.startRecording();
-                            recordFlag = true;
-                            getBaseContext().sendBroadcast(new Intent().setAction("Station").putExtra("station", "out of the station."));
-                        }
-                    }
-                }
-                ((WifiManager) mContext.getApplicationContext().getSystemService(Context.WIFI_SERVICE)).startScan();
-            }
-        }, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));
-        ((WifiManager) mContext.getApplicationContext().getSystemService(Context.WIFI_SERVICE)).startScan();
+//エラー発生のため、コメントアウト。フラグによる制御が失敗してAudioProcを同時に呼び出していることが原因。
+//        mContext.registerReceiver(new BroadcastReceiver() {
+//            @Override
+//            public void onReceive(Context context, Intent intent) {
+//                List<ScanResult> resultList = ((WifiManager)mContext.getSystemService(Context.WIFI_SERVICE)).getScanResults();
+//                int resultSize = resultList.size();
+//                wifiCount = 0;
+//                for(ScanResult scanResult:resultList){
+//                    if(scanResult.SSID.equals("TOBU_Free_Wi-Fi") || scanResult.SSID.equals("Metro_Free_Wi-Fi")){
+//                        Log.d("SSID", scanResult.SSID);
+//                        mInStation = true;
+//                        getBaseContext().sendBroadcast(new Intent().setAction("Station").putExtra("station", "in the station."));
+//                        awayCount = 0;
+//                        handler.post(new Runnable() {
+//                            @Override
+//                            public void run() {
+//                                mStationTv.setText("in the station.....");
+//                            }
+//                        });
+//                        break;
+//                    }
+//                    wifiCount++;
+//                    if(wifiCount == resultSize && mInStation && !recordFlag && state.equals("Stop")) {
+//                        awayCount++;
+//                        if(awayCount > 3) {
+//                            mInStation = false;
+//                            mAudioProc.startRecording();
+//                            recordFlag = true;
+//                            getBaseContext().sendBroadcast(new Intent().setAction("Station").putExtra("station", "out of the station."));
+//                        }
+//                    }
+//                }
+//                ((WifiManager) mContext.getApplicationContext().getSystemService(Context.WIFI_SERVICE)).startScan();
+//            }
+//        }, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));
+//        ((WifiManager) mContext.getApplicationContext().getSystemService(Context.WIFI_SERVICE)).startScan();
     }
 
     private void stopPrediction(){
