@@ -100,7 +100,7 @@ public class SensorDataCollector implements SensorEventListener {
 //    private final static String TESTDATA_SCALED_PATH = HARMASTER_PATH + "/testdata_scaled.txt";
 //    private final static String TESTDATA_PATH = HARMASTER_PATH + "testdata.txt";
     private String mFolderName;
-    private String mState = "";
+    private String mState = "Stop";
 
     SensorDataCollector(Context context){
         mContext = context;
@@ -263,7 +263,6 @@ public class SensorDataCollector implements SensorEventListener {
                         str = bufferedReader.readLine();
                         array = bufferedReader.readLine().split(" ");
                         str = array[0];
-                        Log.d("str", str);
                         bufferedReader.close();
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -304,16 +303,11 @@ public class SensorDataCollector implements SensorEventListener {
                             case 10:
                                 mState = "Bicycle";
                                 break;
-//                            case 11:
-//                                mState = "Train";
-//                                break;
-//                            case 12:
-//                                mState = "Bus";
-//                                break;
                             default:
                                 break;
                         }
                     }
+                    writeFile(mState, "temp_state.txt", false);
                 }
 
                 handler.post(new Runnable() {
@@ -648,6 +642,17 @@ public class SensorDataCollector implements SensorEventListener {
     }
 
     public String getState(){
+        //Log.d("SensorDataCollector.getState:", mState);
         return this.mState;
+    }
+
+    private void writeFile(String str, String filename, boolean append){
+        try {
+            BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(new File(HARMASTER_PATH + "/" + filename), append), "UTF-8"));
+            bufferedWriter.write(str + "\n");
+            bufferedWriter.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }

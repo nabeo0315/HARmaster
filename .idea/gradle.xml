@@ -10,6 +10,7 @@
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/androidlibsvm-release" />
             <option value="$PROJECT_DIR$/app" />
+            <option value="$PROJECT_DIR$/harlib" />
           </set>
         </option>
         <option name="resolveModulePerSourceSet" value="false" />

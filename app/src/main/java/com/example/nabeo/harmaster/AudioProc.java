@@ -29,7 +29,7 @@ public class AudioProc {
     private static int RECORDER_AUDIO_ENCODING = AudioFormat.ENCODING_PCM_16BIT;
     private static int RECORDER_SAMPLERATE = 8000;
 
-    private static int FFT_SIZE = 32768;//8192;
+    private static int FFT_SIZE = 32768;//or 8192;
     private static int MFCCS_VALUE = 12;
     private static int MEL_BANDS = 20;
     private static double[] FREQ_BANDEDGES = {50,250,500,1000,2000};
@@ -51,7 +51,9 @@ public class AudioProc {
     public final static String ROOT_DIR = Environment.getExternalStorageDirectory().toString();
     private final static String HARMASTER_PATH = ROOT_DIR +"/HARmaster";
     private final static String OUTPUT_MFCC = HARMASTER_PATH + "/output_mfcc.txt";
+    private final static String OUTPUT_PATH = HARMASTER_PATH + "/output.txt";
     private final static String MODEL_AUDIO = HARMASTER_PATH + "/0828_model_optionb.model";//"/model_audio2.model";
+    private final static String TEMPFILE_PATH = HARMASTER_PATH + "/temp_state.txt";
 
     private File file;
     private FileObserver dataObserver;
@@ -63,8 +65,6 @@ public class AudioProc {
 
     private String mState = "";
     private boolean recordFlag;
-
-    private double[] probs = new double[12];
 
     AudioProc(){
 
@@ -114,50 +114,13 @@ public class AudioProc {
                             mState = "Bus";
                         }
                         bufferedReader.close();
-
-                        if(str.equals("1") || str.equals("3")){
-                            probs[0] = 0;
-                            probs[1] = 0;
-                            probs[2] = 0;
-                            probs[3] = 0;
-                            probs[4] = 0;
-                            probs[5] = 0;
-                            probs[6] = 0;
-                            probs[7] = 0;
-                            probs[8] = 0;
-                            probs[9] = 0;
-                            probs[10] = Double.valueOf(array[3]);
-                            probs[11] = Double.valueOf(array[1]);
-                        }
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
+                    writeFile(mState, "temp_state.txt", false);
                 }
             }
         };
-
-//        fileObserver = new FileObserver(OUTPUT_MFCC) {
-//            @Override
-//            public void onEvent(int event, @Nullable String path) {
-//                if(event == FileObserver.CLOSE_WRITE){
-//                    try {
-//                        BufferedReader bufferedReader = new BufferedReader(new FileReader(OUTPUT_MFCC));
-//                        String str = bufferedReader.readLine();
-//                        Log.d("str", str);
-//                        if(str.equals("1")){
-//                            mState = "Train";
-//                        } else if(str.equals("2")){
-//                            mState = "unknown";
-//                        } else if(str.equals("3")){
-//                            mState = "Bus";
-//                        }
-//                        bufferedReader.close();
-//                    } catch (IOException e) {
-//                        e.printStackTrace();
-//                    }
-//                }
-//            }
-//        };
 
         freqBandIdx = new int[FREQ_BANDEDGES.length];
         for (int i = 0; i < FREQ_BANDEDGES.length; i ++)
@@ -276,7 +239,6 @@ public class AudioProc {
                 try {
                     BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file, false), "UTF-8"));
                     bufferedWriter.write(str_scaled);
-                    //bufferedWriter.write("\n");
                     bufferedWriter.close();
 
                 } catch (IOException e) {
@@ -294,15 +256,20 @@ public class AudioProc {
         return this.mState;
     }
 
-    public double[] getProbs(){
-        return this.probs;
-    }
-
     public void stop(){
         recordFlag = false;
-        //fileObserver.stopWatching();
         dataObserver.stopWatching();
         audioRecorder.stop();
         recordingThread.interrupt();
+    }
+
+    private void writeFile(String str, String filename, boolean append){
+        try {
+            BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(new File(HARMASTER_PATH + "/" + filename), append), "UTF-8"));
+            bufferedWriter.write(str + "\n");
+            bufferedWriter.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }

@@ -9,6 +9,8 @@ import android.content.IntentFilter;
 import android.content.pm.ApplicationInfo;
 import android.net.wifi.ScanResult;
 import android.os.Build;
+import android.os.FileObserver;
+import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentTransaction;
 import android.content.Context;
@@ -62,6 +64,8 @@ public class MainActivity extends AppCompatActivity {
 
     public final static String ROOT_DIR = Environment.getExternalStorageDirectory().toString();
     private final static String HARMASTER_PATH = ROOT_DIR +"/HARmaster";
+    private final static String OUTPUT_PATH = HARMASTER_PATH + "/output.txt";
+    private final static String TEMPFILE_PATH = HARMASTER_PATH + "/temp_state.txt";
 
     private LocationManager mLocationManager;
     private String mGpsState;
@@ -78,11 +82,13 @@ public class MainActivity extends AppCompatActivity {
     private static String nowState = "", tempState = "Stop", state = "Stop", audioState, preState = "", markovState="Stop";
     private static String[] stateArray, correctedStateArray;
     private static int count = 0, activityCount = 0, vehicleCount = 0, wifiCount = 0, awayCount = 0, stateCount = 0;
+    private static StateCounter mStateCounter;
 
     private RecyclerView mRecyclerView;
     private RecyclerAdapter mAdapter;
     private ArrayList<ActivityItem> mData;
     private Timestamp mPreTime;
+    private FileObserver mOutputObserver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -219,16 +225,25 @@ public class MainActivity extends AppCompatActivity {
         stateArray = new String[30];
         correctedStateArray = new String[30];
 
+        mStateCounter = new StateCounter();
+        mStateCounter.initialize();
+
         final Handler handler = new Handler();
-        timer = new Timer();
-        timer.schedule(new TimerTask() {
+        mOutputObserver = new FileObserver(TEMPFILE_PATH) {
             @Override
-            public void run() {
+            public void onEvent(int event, @Nullable String path) {
+                Log.d("event", String.valueOf(event));
+                if(event != FileObserver.CLOSE_WRITE) return;
+
                 Timestamp timestamp = new Timestamp(System.currentTimeMillis());
                 setActivity();
+                String maxState;
                 if (!recordFlag) {
+                    mStateCounter.addCounter(state);
+                    maxState = mStateCounter.getMaxCountState();
+
                     if(stateCount < 30){
-                        stateArray[stateCount] = state;
+                        stateArray[stateCount] = maxState;
                         correctedStateArray[stateCount] = nowState;
                         Log.d("stateArray[" + stateCount + "]", stateArray[stateCount]);
                         stateCount++;
@@ -237,28 +252,30 @@ public class MainActivity extends AppCompatActivity {
                         Log.d("viterbi", viterbi.viterbiAlgorithm(stateArray, correctedStateArray));
                         stateCount = 0;
                     }
-                    //markovState = markovProc.getState(probs, markovState);
-                    writeFile(timestamp.toString() + " " + state + " " + nowState + " " + gpsSpeedinKilo + " " + mLongitude + " " + mLatitude, "predicted_activity.txt");
+
+                    writeFile(timestamp.toString() + " " + state + " " + maxState + " " + nowState + " " + gpsSpeedinKilo + " " + mLongitude + " " + mLatitude, "predicted_activity.txt");
                     writeFile(timestamp.toString() + " " + nowState, "corrected_result.txt");
-                    writeFile(timestamp.toString() + "," + state+ "," + nowState, "compare.csv");
+                    writeFile(timestamp.toString() + "," + state+ "," + maxState + "," + nowState, "compare.csv");
 
                     if (tempState.equals(state)) count++;
                     else count = 0;
-                    if (count > 8) {
-                        if (!((nowState.equals("Bus") || nowState.equals("Bicycle")) && state.equals("Train"))
-                                && !((nowState.equals("Train") || nowState.equals("Bicycle")) && state.equals("Bus"))
-                                && !((nowState.equals("Train") || nowState.equals("Bus")) && state.equals("Bicycle"))
-                                && !((nowState.equals("Up-Elevator") || nowState.equals("Down-Elevator")) && state.equals("Bicycle"))){
-                            nowState = state;
+                    if (count > 5) {
+                        if (!((nowState.equals("Bus") || nowState.equals("Bicycle")) && maxState.equals("Train"))
+                                && !((nowState.equals("Train") || nowState.equals("Bicycle")) && maxState.equals("Bus"))
+                                && !((nowState.equals("Train") || nowState.equals("Bus")) && maxState.equals("Bicycle"))
+                                && !((nowState.equals("Up-Elevator") || nowState.equals("Down-Elevator")) && maxState.equals("Bicycle"))){
+                            nowState = maxState;
                         }
                     }
-                    tempState = state;
+                    tempState = maxState;
                 } else if (recordFlag) {
                     audioState = mAudioProc.getState();
+                    mStateCounter.addCounter(audioState);
+                    maxState = mStateCounter.getMaxCountState();
                     //markovState = markovProc.getState(audioProbs, markovState);
 
                     if(stateCount < 30){
-                        stateArray[stateCount] = audioState;
+                        stateArray[stateCount] = maxState;
                         correctedStateArray[stateCount] = nowState;
                         stateCount++;
                     }else if(stateCount >= 30){
@@ -266,25 +283,26 @@ public class MainActivity extends AppCompatActivity {
                         stateCount = 0;
                     }
 
+                    final String tvState = maxState;
                     handler.post(new Runnable() {
                         @Override
                         public void run() {
-                            mainTv.setText(audioState);
+                            mainTv.setText(tvState);
                         }
                     });
 
-                    writeFile(timestamp.toString() + " " + audioState + "(audio)" + " " + nowState + " " + gpsSpeedinKilo + " " + mLongitude + " " + mLatitude, "predicted_activity.txt");
+                    writeFile(timestamp.toString() + " " + audioState + "(audio)" + " " + maxState + " " + nowState + " " + gpsSpeedinKilo + " " + mLongitude + " " + mLatitude, "predicted_activity.txt");
                     writeFile(timestamp.toString() + " " + nowState, "corrected_result.txt");
-                    writeFile(timestamp.toString() + "," + audioState + "," + nowState, "compare.csv");
+                    writeFile(timestamp.toString() + "," + audioState + "," + maxState + "," + nowState, "compare.csv");
 
-                    if (tempState.equals(audioState)) count++;
+                    if (tempState.equals(maxState)) count++;
                     else count = 0;
-                    if (count > 8) {
-                        if (!((nowState.equals("Bus") || nowState.equals("Bicycle")) && audioState.equals("Train")) && !((nowState.equals("Train") || nowState.equals("Bicycle")) && audioState.equals("Bus"))) {
-                            nowState = audioState;
+                    if (count > 5) {
+                        if (!((nowState.equals("Bus") || nowState.equals("Bicycle")) && maxState.equals("Train")) && !((nowState.equals("Train") || nowState.equals("Bicycle")) && maxState.equals("Bus"))) {
+                            nowState = maxState;
                         }
                     }
-                    tempState = audioState;
+                    tempState = maxState;
                 }
 
                 //set pictogram
@@ -311,7 +329,100 @@ public class MainActivity extends AppCompatActivity {
                     });
                 }
             }
-        }, 0, 1000);
+        };
+        mOutputObserver.startWatching();
+//        timer = new Timer();
+//        timer.schedule(new TimerTask() {
+//            @Override
+//            public void run() {
+//                Timestamp timestamp = new Timestamp(System.currentTimeMillis());
+//                setActivity();
+//                if (!recordFlag) {
+//                    if(stateCount < 30){
+//                        stateArray[stateCount] = state;
+//                        correctedStateArray[stateCount] = nowState;
+//                        Log.d("stateArray[" + stateCount + "]", stateArray[stateCount]);
+//                        stateCount++;
+//                    }else if(stateCount >= 30){
+//                        writeFile(viterbi.viterbiAlgorithm(stateArray, correctedStateArray), "viterbi.csv");
+//                        Log.d("viterbi", viterbi.viterbiAlgorithm(stateArray, correctedStateArray));
+//                        stateCount = 0;
+//                    }
+//                    //markovState = markovProc.getState(probs, markovState);
+//                    writeFile(timestamp.toString() + " " + state + " " + nowState + " " + gpsSpeedinKilo + " " + mLongitude + " " + mLatitude, "predicted_activity.txt");
+//                    writeFile(timestamp.toString() + " " + nowState, "corrected_result.txt");
+//                    writeFile(timestamp.toString() + "," + state+ "," + nowState, "compare.csv");
+//
+//                    if (tempState.equals(state)) count++;
+//                    else count = 0;
+//                    if (count > 5) {
+//                        if (!((nowState.equals("Bus") || nowState.equals("Bicycle")) && state.equals("Train"))
+//                                && !((nowState.equals("Train") || nowState.equals("Bicycle")) && state.equals("Bus"))
+//                                && !((nowState.equals("Train") || nowState.equals("Bus")) && state.equals("Bicycle"))
+//                                && !((nowState.equals("Up-Elevator") || nowState.equals("Down-Elevator")) && state.equals("Bicycle"))){
+//                            nowState = state;
+//                        }
+//                    }
+//                    tempState = state;
+//                } else if (recordFlag) {
+//                    audioState = mAudioProc.getState();
+//                    //markovState = markovProc.getState(audioProbs, markovState);
+//
+//                    if(stateCount < 30){
+//                        stateArray[stateCount] = audioState;
+//                        correctedStateArray[stateCount] = nowState;
+//                        stateCount++;
+//                    }else if(stateCount >= 30){
+//                        writeFile(viterbi.viterbiAlgorithm(stateArray, correctedStateArray), "viterbi.csv");
+//                        stateCount = 0;
+//                    }
+//
+//                    handler.post(new Runnable() {
+//                        @Override
+//                        public void run() {
+//                            mainTv.setText(audioState);
+//                        }
+//                    });
+//
+//                    writeFile(timestamp.toString() + " " + audioState + "(audio)" + " " + nowState + " " + gpsSpeedinKilo + " " + mLongitude + " " + mLatitude, "predicted_activity.txt");
+//                    writeFile(timestamp.toString() + " " + nowState, "corrected_result.txt");
+//                    writeFile(timestamp.toString() + "," + audioState + "," + nowState, "compare.csv");
+//
+//                    if (tempState.equals(audioState)) count++;
+//                    else count = 0;
+//                    if (count > 5) {
+//                        if (!((nowState.equals("Bus") || nowState.equals("Bicycle")) && audioState.equals("Train")) && !((nowState.equals("Train") || nowState.equals("Bicycle")) && audioState.equals("Bus"))) {
+//                            nowState = audioState;
+//                        }
+//                    }
+//                    tempState = audioState;
+//                }
+//
+//                //set pictogram
+//                if(!preState.equals(nowState)){
+//                    handler.post(new Runnable() {
+//                        @Override
+//                        public void run() {
+//                            preState = nowState;
+//                            mData.add(new ActivityItem(nowState));
+//                            mAdapter.notifyItemInserted(mData.size());
+//                            int size = mData.size();
+//                            if(size > 1){
+//                                Timestamp nowTime = new Timestamp(System.currentTimeMillis());
+//                                ActivityItem activityItem = new ActivityItem(mData.get(size-2).getState());
+//                                activityItem.setTime(nowTime.getTime() - mPreTime.getTime());
+//
+//                                mData.set(size-2, activityItem);
+//                                //mData.get(size-1).setDistance();
+//                                mAdapter.notifyItemChanged(size-1, activityItem);
+//                                Log.v("change", String.valueOf(nowTime.getTime() - mPreTime.getTime()));
+//                            }
+//                            mPreTime = new Timestamp(System.currentTimeMillis());
+//                        }
+//                    });
+//                }
+//            }
+//        }, 0, 1000);
 //エラー発生のため、コメントアウト。フラグによる制御が失敗してAudioProcを同時に呼び出していることが原因。
 //        mContext.registerReceiver(new BroadcastReceiver() {
 //            @Override
@@ -352,12 +463,14 @@ public class MainActivity extends AppCompatActivity {
 
     private void stopPrediction(){
         mSensorDataCollector.stopSensor();
-        timer.cancel();
+        mOutputObserver.stopWatching();
+        //timer.cancel();
     }
 
     public static void setActivity(){
         state = mSensorDataCollector.getState();
-        Log.d("vehiclecount", String.valueOf(vehicleCount));
+        Log.d("activitycount", String.valueOf(activityCount));
+        Log.d("state", state);
         if(state.equals("Stop")){
             activityCount = 0;
         }
