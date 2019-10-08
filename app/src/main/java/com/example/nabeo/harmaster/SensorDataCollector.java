@@ -235,9 +235,7 @@ public class SensorDataCollector implements SensorEventListener {
                                 if(getAve_AccXY()  > 4 && !predictFlag){
                                     mState = "Walking";
                                 }
-                                //Log.d("d", "s");
                                 recordLogfile();
-                                //storeGpsValues();
                             }
                             if (!fileObserverFlag) {
                                 outputObserver.startWatching();
@@ -337,10 +335,6 @@ public class SensorDataCollector implements SensorEventListener {
                 Values[3] = globalLinearAccValues[0];
                 Values[4] = globalLinearAccValues[1];
                 Values[5] = globalLinearAccValues[2];
-
-//                mAcc_x.setText(String.valueOf(globalAccValues[0]));
-//                mAcc_y.setText(String.valueOf(globalAccValues[1]));
-//                mAcc_z.setText(String.valueOf(globalAccValues[2]));
                 break;
 
             case Sensor.TYPE_GRAVITY:
@@ -354,7 +348,6 @@ public class SensorDataCollector implements SensorEventListener {
             case Sensor.TYPE_PRESSURE:
                 pressure = event.values[0];
                 Values[6] = pressure;
-                //mPressure.setText(String.valueOf(pressure));
                 break;
 
             case Sensor.TYPE_GYROSCOPE:

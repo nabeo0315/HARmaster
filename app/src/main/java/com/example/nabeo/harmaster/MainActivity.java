@@ -34,6 +34,7 @@ import android.view.WindowManager;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.beardedhen.androidbootstrap.AwesomeTextView;
 import com.beardedhen.androidbootstrap.BootstrapButton;
@@ -79,10 +80,12 @@ public class MainActivity extends AppCompatActivity {
 
     private static boolean recordFlag = false;
     private static boolean mInStation = false;
+    private static boolean sInElevator = false;
     private static String nowState = "", tempState = "Stop", state = "Stop", audioState, preState = "", markovState="Stop";
     private static String[] stateArray, correctedStateArray;
     private static int count = 0, activityCount = 0, vehicleCount = 0, wifiCount = 0, awayCount = 0, stateCount = 0;
     private static StateCounter mStateCounter;
+    private static FloorPrediction sFloorPrediction;
 
     private RecyclerView mRecyclerView;
     private RecyclerAdapter mAdapter;
@@ -228,6 +231,8 @@ public class MainActivity extends AppCompatActivity {
         mStateCounter = new StateCounter();
         mStateCounter.initialize();
 
+        sFloorPrediction = new FloorPrediction(this);
+
         final Handler handler = new Handler();
         mOutputObserver = new FileObserver(TEMPFILE_PATH) {
             @Override
@@ -251,6 +256,20 @@ public class MainActivity extends AppCompatActivity {
                         writeFile(viterbi.viterbiAlgorithm(stateArray, correctedStateArray), "viterbi.csv");
                         Log.d("viterbi", viterbi.viterbiAlgorithm(stateArray, correctedStateArray));
                         stateCount = 0;
+                    }
+
+                    if((maxState.equals("Up-Elevator") || maxState.equals("Down-Elevator")) && !sInElevator){
+                        sFloorPrediction.setStartValue();
+                        sInElevator = true;
+                    }else if(!(maxState.equals("Up-Elevator") || maxState.equals("Down-Elevator")) && sInElevator){
+                        handler.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                Toast toast = Toast.makeText(mContext, String.valueOf(sFloorPrediction.predictFloor()), Toast.LENGTH_LONG);
+                                toast.show();
+                            }
+                        });
+                        sInElevator = false;
                     }
 
                     writeFile(timestamp.toString() + " " + state + " " + maxState + " " + nowState + " " + gpsSpeedinKilo + " " + mLongitude + " " + mLatitude, "predicted_activity.txt");
