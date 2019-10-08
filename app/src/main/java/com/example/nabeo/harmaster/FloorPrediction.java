@@ -39,7 +39,7 @@ public class FloorPrediction implements SensorEventListener {
     }
 
     public int predictFloor(){
-        return (int)((mPressValue - mStartValue) / STANDARD);
+        return Math.abs((int)((mPressValue - mStartValue) / STANDARD));
     }
 
     @Override
