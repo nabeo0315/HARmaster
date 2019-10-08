@@ -16,7 +16,7 @@ public class FloorPrediction implements SensorEventListener {
     private Context mContext;
     private SensorManager mSensorManager;
 
-    private final double STANDARD = 0.2;
+    private final double STANDARD = 0.3;
 
     public FloorPrediction(Context context){
         mContext = context;
